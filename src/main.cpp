@@ -11,11 +11,15 @@ using Eigen::MatrixXf;
 MatrixXf p1(1, 3), p2(1, 3), q1(1, 3), q2(1, 3);
 static int window_width, window_height;
 
+
+static int timer_active = 0 ;
+static float timer = 0; 
 double parametar = 0, direction = 1;
 double parametar_max, parametar_min, s1, s2, s3 ;
 
 void nacrtaj_ose();
 static void on_keyboard(unsigned char key, int x, int y);
+static void on_timer(int value);
 static void on_reshape(int width, int height);
 static void  on_display(void);
 void pocetni_krajnji_parametri();
@@ -33,7 +37,6 @@ Eigen::Vector4d slerp( MatrixXf q1, MatrixXf q2, double t_m, double par );
 
 int main (int argc, char ** argv) {
  
-    pocetni_krajnji_parametri();
    
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
@@ -48,7 +51,8 @@ int main (int argc, char ** argv) {
     glutKeyboardFunc(on_keyboard);
     glutDisplayFunc(on_display);
     glutIdleFunc(on_display);
-    
+
+//     pocetni_krajnji_parametri();
     
       
     glutMainLoop();
@@ -60,16 +64,36 @@ int main (int argc, char ** argv) {
 
 static void on_keyboard(unsigned char key, int x, int y){
     switch (key) {
-    case 27:
-        /* Zavrsava se program. */
-        exit(0);
-        break;
+        case 27:
+            /* Zavrsava se program. */
+            exit(0);
+            break;
+        
+        case 'g' :
+        case 'G' :
+            if (!timer_active) {
+                glutTimerFunc(50, on_timer, 0);
+                timer_active = 1;
+            }
+            break;
+        
+        case 's' :
+        case 'S' :
+            timer_active = 0;
+            break;
     }
 }
+
 static void on_reshape(int width, int height) {
     /* Pamte se sirina i visina prozora. */
     window_width = width;
     window_height = height;
+    
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    gluPerspective( 40, window_width/(float)window_height, 1, 500. );
+
+    
 }
 
 void pocetni_krajnji_parametri(){
@@ -141,15 +165,30 @@ void svetlo_materijali(){
     glEnable(GL_LIGHT0);
 }
 
-static void on_display(void)
-{
+static void on_timer(int value) {
+    
+    if(value != 0)
+        return;
+    
+    timer += 0.2;
+    std::cout<<timer<<"\n";
+    if( timer > parametar_max ) {
+        timer = 0;
+        timer_active = 0;
+        return;
+    }
+        
+    glutPostRedisplay();
+    
+    if(timer_active)
+        glutTimerFunc(50, on_timer, 0);
+}
+
+
+static void on_display(void){
+    
     /* Brise se prethodni sadrzaj prozora. */
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    gluPerspective( 40,
-                    window_width/(float)window_height, 1, 500. );
 
     
     /* Podesava se tacka pogleda. */
@@ -160,24 +199,26 @@ static void on_display(void)
                0, 1, 0
               );
 
-    
+    /* Zelimo da objekti budu zadate boje */
     glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE);
     glEnable(GL_COLOR_MATERIAL);
     
+    nacrtaj_ose();
+    pocetni_krajnji_parametri();
     
-    if ( parametar <= parametar_max && direction == 1 )
-        parametar += 0.1;   
     
-    if ( parametar >= parametar_min && direction == -1 )
-        parametar -= 0.1;
+    glPushMatrix();
     
-    if ( parametar < parametar_min && direction == -1 )
-        direction = 1;
     
-    if ( parametar > parametar_max && direction == 1 )
-        direction = -1;
+    MatrixXf  pk(1, 3);
     
-    Eigen::Vector4d qs = slerp( q1, q2, parametar_max, parametar );
+    pk = (1 - parametar/parametar_max )*p1 + ( parametar/parametar_max )*p2 ;
+
+    double x = pk(0), y = pk(1), z = pk(2) ;    
+    glTranslatef(x, y, z);
+    
+    
+    Eigen::Vector4d qs = slerp( q1, q2, parametar_max, timer );
     
     MatrixXf qs_matrix (1, 4), vektor_p(1, 3), vektor_p1(1, 3), vektor_p2(1, 3) ;
     
@@ -185,36 +226,21 @@ static void on_display(void)
     qs_matrix << qs(0), qs(1), qs(2), qs(3);
     //std::cout<<"QS : "<< qs_matrix<<"\n";
     
-    double fi, fi1, fi2 ;
+    double fi ;
     
     
-    Q2AxisAngle ( qs_matrix, vektor_p,  fi  );
-    Q2AxisAngle ( q1,        vektor_p1, fi1 );    
-    Q2AxisAngle ( q2,        vektor_p2, fi2 );
+    Q2AxisAngle ( qs_matrix, vektor_p, fi);
 
-    MatrixXf rodr(1, 3), rodr_poc(1, 3), rodr_kraj(1, 3), pk(1, 3);
-    
-    rodr      = Rodigez ( vektor_p,  fi  );
-    rodr_poc  = Rodigez ( vektor_p1, fi1 );
-    rodr_kraj = Rodigez ( vektor_p2, fi2 );
-    
-    
-    
-    pk = (1 - parametar/parametar_max )*p1 + ( parametar/parametar_max )*p2 ;
-    //std::cout<<"Rodr: "<<rodr<<"\nPK :" <<pk<<"\n";    
-
-    double x = pk(0), y = pk(1),  z = pk(2) ;    
-    glTranslatef(x, y, z);
 
     glRotatef(fi/M_PI*180, vektor_p(0), vektor_p(1), vektor_p(2) );
         
     
-    glPushMatrix();
-    
     
     glColor3f(1, 0.4, 0);
-    glutSolidCube(3);
+    glutSolidCube(2);
     nacrtaj_ose();
+    
+    glPopMatrix();
     
     
     glutSwapBuffers();

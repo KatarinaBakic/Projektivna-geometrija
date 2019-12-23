@@ -14,16 +14,16 @@ static int window_width, window_height;
 
 static int timer_active = 0 ;
 static float timer = 0; 
-double parametar = 0, direction = 1;
-double parametar_max, parametar_min, s1, s2, s3 ;
+double parametar_max = 50;
 
-void nacrtaj_ose();
 static void on_keyboard(unsigned char key, int x, int y);
 static void on_timer(int value);
 static void on_reshape(int width, int height);
 static void  on_display(void);
-void pocetni_krajnji_parametri();
+
+void nacrtaj_ose();
 void svetlo_materijali();
+void pocetni_krajnji_parametri();
 
 
 MatrixXf Euler2A( double ugao1, double ugao2, double ugao3 );
@@ -52,8 +52,6 @@ int main (int argc, char ** argv) {
     glutDisplayFunc(on_display);
     glutIdleFunc(on_display);
 
-//     pocetni_krajnji_parametri();
-    
       
     glutMainLoop();
 	return 0;
@@ -85,63 +83,92 @@ static void on_keyboard(unsigned char key, int x, int y){
 }
 
 static void on_reshape(int width, int height) {
+  
     /* Pamte se sirina i visina prozora. */
     window_width = width;
     window_height = height;
     
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    gluPerspective( 40, window_width/(float)window_height, 1, 500. );
+    gluPerspective( 40,
+                    window_width/(float)window_height, 1, 500);
 
     
 }
 
 void pocetni_krajnji_parametri(){
-    // Pocetni polozaj: 
-   
+    
+    /* Pocetni polozaj:  */
+    
+    glPushMatrix();
+    
     p1 << 3.2, 3.4, 4.2 ;
+    
+    glTranslatef( p1(0), p1(1), p1(2) );
     
     MatrixXf vektor_p1(1, 3), vektor_p2(1, 3);
     double fi1, fi2 ;
+    
     AxisAngle(Euler2A(3*M_PI/4.0, M_PI/4.0, 2*M_PI/5.0), vektor_p1, fi1);
     
-    //std::cout<< "Pocetna pozicija: "<< p1<< "\nVektor_p: "<<vektor_p<<"\n ugao FI: "<<fi << std::endl ;
-    
     q1 = AxisAngle2Q (vektor_p1, fi1);
-    //std::cout<< "Q1 : "<<q1 <<"\n";
     
-    // Krajnji polozaj: 
+    glRotatef(fi1/M_PI*180, vektor_p1(0), vektor_p1(1), vektor_p1(2));
+
+    glColor3f(1, 0.5, 0);
+    glutWireCube(1);
+//     nacrtaj_ose();
+    glPopMatrix();
+
+    // Krajnji polozaj:
+    
+    glPushMatrix ();
+    
     p2 << -0.25, -0.45, -1.9 ;
     
-    AxisAngle( Euler2A( 2*M_PI/3.0, -4*M_PI/7.0, 7*M_PI/4.0 ), vektor_p2, fi2 );
+    glTranslatef( p2(0), p2(1), p2(2) );
+    
+    AxisAngle( Euler2A(  2*M_PI/3.0, -4*M_PI/7.0, 7*M_PI/4.0 ), vektor_p2, fi2 );
+    
+    glRotatef(fi2/M_PI*180, vektor_p2(0), vektor_p2(1), vektor_p2(2));
     
     q2 = AxisAngle2Q( vektor_p2, fi2 );
-    //std::cout<< "Q2 : "<<q2 <<"\n";
+
+    glColor3f(1, 0.5, 0);
+    glutWireCube(1);
+//     nacrtaj_ose();
     
-    parametar_max = 15;
-    parametar_min = 0;
+    
+    glPopMatrix();
+
     
 }
 
 void nacrtaj_ose(){
     
   glBegin(GL_LINES);
+  
     glColor3f(1,0,0);
     glVertex3f(0,0,0);
-    glVertex3f(7,0,0);
-    glEnd();
+    glVertex3f(17,0,0);
+
+  glEnd();
     
-    glBegin(GL_LINES);
+  glBegin(GL_LINES);
+  
     glColor3f(0,1,0);
     glVertex3f(0,0,0);
-    glVertex3f(0,7,0);
-    glEnd();
+    glVertex3f(0,17,0);
     
-    glBegin(GL_LINES);
+  glEnd();
+    
+  glBegin(GL_LINES);
+  
     glColor3f(0,0,1);
     glVertex3f(0,0,0);
-    glVertex3f(0,0,7);
-    glEnd();
+    glVertex3f(0,0,17);
+    
+  glEnd();
       
 }
 void svetlo_materijali(){
@@ -163,6 +190,20 @@ void svetlo_materijali(){
     glLightf ( GL_LIGHT0, GL_LINEAR_ATTENUATION,   0.01 );
 	
     glEnable(GL_LIGHT0);
+    
+    /*Koeficijenti za materijale: */
+    GLfloat ambient_coeffs[]={0.4,0.2,0.3,1};
+	GLfloat specular_coeffs[]={0.6,0.7,0.6,1};
+    GLfloat diffuse_coeffs[]={0.9,0.8,0.9,1};
+    GLfloat shininess=70;
+	    
+    /*Postavljanje materijala: */
+    glMaterialfv(GL_FRONT,GL_AMBIENT, ambient_coeffs);
+    glMaterialfv(GL_FRONT, GL_SPECULAR, specular_coeffs);
+    glMaterialfv(GL_FRONT, GL_DIFFUSE, diffuse_coeffs);
+    glMaterialf(GL_FRONT, GL_SHININESS, shininess);
+	    
+    
 }
 
 static void on_timer(int value) {
@@ -170,16 +211,11 @@ static void on_timer(int value) {
     if(value != 0)
         return;
     
-    timer += 0.2;
-    std::cout<<timer<<"\n";
-    if( timer > parametar_max ) {
-        timer = 0;
-        timer_active = 0;
-        return;
-    }
+    if( timer < parametar_max ) {
+        timer += 0.4;
         
-    glutPostRedisplay();
-    
+        glutPostRedisplay();
+    }
     if(timer_active)
         glutTimerFunc(50, on_timer, 0);
 }
@@ -194,9 +230,9 @@ static void on_display(void){
     /* Podesava se tacka pogleda. */
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
-    gluLookAt( 15, 20, 15,
-               0, 0, 0,
-               0, 1, 0
+    gluLookAt(15, 30, 15,
+               0,  0,  0,
+               0,  1,  0
               );
 
     /* Zelimo da objekti budu zadate boje */
@@ -212,7 +248,7 @@ static void on_display(void){
     
     MatrixXf  pk(1, 3);
     
-    pk = (1 - parametar/parametar_max )*p1 + ( parametar/parametar_max )*p2 ;
+    pk = (1 - timer/parametar_max )*p1 + ( timer/parametar_max )*p2 ;
 
     double x = pk(0), y = pk(1), z = pk(2) ;    
     glTranslatef(x, y, z);
@@ -224,21 +260,18 @@ static void on_display(void){
     
     // potreban nam je qs kao matrica, radi daljeg racuna
     qs_matrix << qs(0), qs(1), qs(2), qs(3);
-    //std::cout<<"QS : "<< qs_matrix<<"\n";
     
     double fi ;
     
-    
     Q2AxisAngle ( qs_matrix, vektor_p, fi);
-
 
     glRotatef(fi/M_PI*180, vektor_p(0), vektor_p(1), vektor_p(2) );
         
+    glColor3f(0.7, 0, 0.5);
+    glutSolidCube(1);
     
-    
-    glColor3f(1, 0.4, 0);
-    glutSolidCube(2);
     nacrtaj_ose();
+    
     
     glPopMatrix();
     
